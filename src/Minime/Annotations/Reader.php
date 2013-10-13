@@ -6,8 +6,16 @@ use \ReflectionClass;
 use \ReflectionProperty;
 use \ReflectionMethod;
 
-class Facade
+class Reader
 {
+
+    protected $Parser;
+
+    public function __construct(Parser $Parser = null)
+    {
+        ($Parser) ? $this->Parser = $Parser : $this->Parser = new Parser();
+    }
+
     /**
      * Retrieve all annotations from a given class
      * 
@@ -15,10 +23,10 @@ class Facade
      * @return Minime\Annotations\AnnotationsBag Annotations collection
      * @throws  \ReflectionException If class is not found
      */
-    public static function getClassAnnotations($class)
+    public function getClassAnnotations($class)
     {
         $reflection = new ReflectionClass($class);
-        return (new Parser($reflection->getDocComment()))->parse();
+        return $this->createAnnotationsBag($reflection);
     }
 
     /**
@@ -29,10 +37,10 @@ class Facade
      * @return Minime\Annotations\AnnotationsBag Annotations collection
      * @throws  \ReflectionException If property is undefined
      */
-    public static function getPropertyAnnotations($class, $property)
+    public function getPropertyAnnotations($class, $property)
     {
         $reflection = new ReflectionProperty($class, $property);
-        return (new Parser($reflection->getDocComment()))->parse();
+        return $this->createAnnotationsBag($reflection);
     }
 
     /**
@@ -43,9 +51,17 @@ class Facade
      * @return Minime\Annotations\AnnotationsBag Annotations collection
      * @throws  \ReflectionException If method is undefined
      */
-    public static function getMethodAnnotations($class, $method)
+    public function getMethodAnnotations($class, $method)
     {
         $reflection = new ReflectionMethod($class, $method);
-        return (new Parser($reflection->getDocComment()))->parse();
+        return $this->createAnnotationsBag($reflection);
     }
+
+    protected function createAnnotationsBag($reflection)
+    {
+        $Parser = $this->Parser;
+        $annotations = $Parser->parse($reflection->getDocComment());
+        return new AnnotationsBag($annotations);
+    }
+
 }

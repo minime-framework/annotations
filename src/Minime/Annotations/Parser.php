@@ -7,46 +7,33 @@ use StrScan\StringScanner;
 class Parser
 {
 
-    const REGEX_ANNOTATION_NAME = '[a-zA-Z\_][a-zA-Z0-9\_\-\.]*';
+    const TOKEN_ANNOTATION_NAME = '[a-zA-Z\_][a-zA-Z0-9\_\-\.]*';
 
-    const REGEX_ANNOTATION_IDENTIFIER = '@';
-
-    /**
-     * The Doc block to parse
-     * @var string
-     */
-    private $raw_doc_block;
-
-    /**
-     * Parser constructor
-     * @param string $raw_doc_block the doc block to parse
-     */
-    public function __construct($raw_doc_block)
-    {
-        $this->raw_doc_block = $raw_doc_block;
-    }
+    const TOKEN_ANNOTATION_IDENTIFIER = '@';
 
     /**
      * Parse a given docblock
-     * @return AnnotationsBag an AnnotationBag Object
+     * 
+     * @param string $raw_doc_block the doc block to parse
+     * @return array Associative array with annotations and values
      */
-    public function parse()
+    public function parse($raw_doc_block)
     {
         $parameters = [];
-        $lines = array_map("rtrim", explode("\n", $this->raw_doc_block));
+        $lines = array_map("rtrim", explode("\n",$raw_doc_block));
         foreach ($lines as $line) {
             $tokenizer = new StringScanner($line);
             $tokenizer->skip('/\s+\*\s+/');
             while (! $tokenizer->hasTerminated()) {
-                $key = $tokenizer->scan('/' . self::REGEX_ANNOTATION_IDENTIFIER . self::REGEX_ANNOTATION_NAME . '/');
+                $key = $tokenizer->scan('/' . self::TOKEN_ANNOTATION_IDENTIFIER . self::TOKEN_ANNOTATION_NAME . '/');
                 if (! $key) { // next line when no annotation is found
                     $tokenizer->terminate();
                     continue;
                 }
 
-                $key = str_replace(self::REGEX_ANNOTATION_IDENTIFIER, '', $key);
+                $key = str_replace(self::TOKEN_ANNOTATION_IDENTIFIER, '', $key);
                 $tokenizer->skip('/\s+/');
-                if ('' == $tokenizer->peek() || $tokenizer->check('/\\'. self::REGEX_ANNOTATION_IDENTIFIER .'/')) { // if implicit boolean
+                if ('' == $tokenizer->peek() || $tokenizer->check('/\\'. self::TOKEN_ANNOTATION_IDENTIFIER .'/')) { // if implicit boolean
                     $parameters[$key] = true;
                     continue;
                 }
@@ -61,23 +48,7 @@ class Parser
             }
         }
 
-        $parameters = $this->condense($parameters);
-
-        return new AnnotationsBag($parameters);
-    }
-
-    private function condense(array $parameters)
-    {
-        return array_map(
-            function ($value) {
-                if (is_array($value) && 1 == count($value)) {
-                    $value = $value[0];
-                }
-
-                return $value;
-            },
-            $parameters
-        );
+        return $this->condense($parameters);
     }
 
     /**
@@ -91,9 +62,9 @@ class Parser
      */
     protected static function parseValue($value, $type = 'string')
     {
-        $method = 'parse'.ucfirst(strtolower($type));
+        $parse_method = 'parse'.ucfirst(strtolower($type));
 
-        return Parser::{$method}($value);
+        return Parser::{$parse_method}($value);
     }
 
     /**
@@ -177,4 +148,19 @@ class Parser
 
         return $json;
     }
+
+    private function condense(array $parameters)
+    {
+        return array_map(
+            function ($value) {
+                if (is_array($value) && 1 == count($value)) {
+                    $value = $value[0];
+                }
+
+                return $value;
+            },
+            $parameters
+        );
+    }
+
 }

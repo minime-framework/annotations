@@ -2,8 +2,7 @@
 
 namespace Minime\Annotations\Traits;
 
-use \Minime\Annotations\Fixtures\AnnotationsFixture;
-use \ReflectionProperty;
+use \Minime\Annotations\Fixtures\ReaderTraitFixture;
 
 class ReaderTest extends \PHPUnit_Framework_TestCase
 {
@@ -12,28 +11,30 @@ class ReaderTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        $this->Fixture = new AnnotationsFixture;
+        $this->Fixture = new ReaderTraitFixture;
+    }
+
+    public function tearDown()
+    {
+        $this->Fixture = null;
     }
 
     public function testTraitReadsAnnotationsFromClass()
     {
-        $this->assertTrue($this->Fixture->getClassAnnotations()->get('post'));
-        $this->assertSame(['x', 'y', 'z'], $this->Fixture->getClassAnnotations()->get('postParam'));
-        $this->assertFalse($this->Fixture->getClassAnnotations()->has('foo'));
+        $annotations = $this->Fixture->getClassAnnotations('\Minime\Annotations\Fixtures\ReaderTraitFixture');
+        $this->assertSame('bar', $annotations->get('value'));
     }
 
     public function testTraitReadsAnnotationsFromProperty()
     {
-        $this->assertTrue($this->Fixture->getPropertyAnnotations('same_line_fixture')->get('post'));
-        $this->assertSame(['x', 'y', 'z'], $this->Fixture->getPropertyAnnotations('same_line_fixture')->get('postParam'));
-        $this->assertFalse($this->Fixture->getPropertyAnnotations('same_line_fixture')->has('foo'));
+        $annotations = $this->Fixture->getPropertyAnnotations('\Minime\Annotations\Fixtures\ReaderTraitFixture', 'property_fixture');
+        $this->assertSame('foo', $annotations->get('value'));
     }
 
     public function testTraitReadsAnnotationsFromMethod()
     {
-        $this->assertTrue($this->Fixture->getMethodAnnotations('method_fixture')->get('post'));
-        $this->assertSame(['x', 'y', 'z'], $this->Fixture->getMethodAnnotations('method_fixture')->get('postParam'));
-        $this->assertFalse($this->Fixture->getMethodAnnotations('method_fixture')->has('foo'));
+        $annotations = $this->Fixture->getMethodAnnotations('\Minime\Annotations\Fixtures\ReaderTraitFixture', 'method_fixture');
+        $this->assertSame('bar', $annotations->get('value'));
     }
 
 }

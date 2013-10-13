@@ -4,8 +4,9 @@ namespace Minime\Annotations;
 
 class AnnotationsBag implements \IteratorAggregate, \Countable
 {
+
     /**
-     * Associative arrays of annotations
+     * Associative array of annotations and values
      * @var array
      */
     private $attributes = [];
@@ -128,26 +129,28 @@ class AnnotationsBag implements \IteratorAggregate, \Countable
     }
 
     /**
-     * IteratorAggregate
+     * @return \ArrayIterator
      */
     public function getIterator()
     {
         return new \ArrayIterator($this->attributes);
     }
 
-    private function validateKeyOrFail($key)
+    protected function validateKeyOrFail($key)
     {
         if(!$this->isKeyValid($key))
         {
-            throw new \InvalidArgumentException('Annotation key must be a valid annotation name.');
+            throw new \InvalidArgumentException('Annotation key must be a valid annotation name string.');
         }
     }
 
-    private function isKeyValid($key)
+    protected function isKeyValid($key)
     {
-        if (preg_match('/^'. Parser::REGEX_ANNOTATION_NAME .'$/', $key)) {
+        if (is_string($key) && !is_numeric($key))
+        {
             return true;    
         }
         return false;
     }
+
 }
