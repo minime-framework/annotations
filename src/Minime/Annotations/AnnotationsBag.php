@@ -105,19 +105,28 @@ class AnnotationsBag implements \IteratorAggregate, \Countable
 
     /**
      * Isolates a given namespace of annotations.
-     *
-     * @param  string                            $pattern namespace
+     * @param string $pattern namespace
      * @return Minime\Annotations\AnnotationsBag
      */
     public function useNamespace($pattern)
     {
-        $annotations = $this->grep('^'.$pattern);
+        $pattern = trim($pattern);
+        if (! is_string($pattern) || empty($pattern)) {
+            throw new \InvalidArgumentException('namespace pattern must be a valid string');
+        }
+        $length = strlen($pattern);
+        if ('.' != $pattern[$length-1]) {
+            $pattern .= '.';
+            $length++;
+        }
         $results = [];
-        foreach ($annotations->export() as $namespace => $value) {
-            $results[str_replace($pattern.'.', '', $namespace)] = $value;
+        foreach ($this->attributes as $key => $value) {
+            if (strpos($key, $pattern) === 0) {
+                $results[substr($key, $length)] = $value;
+            }
         }
 
-        return new self($results);
+        return new static($results);
     }
 
     /**
