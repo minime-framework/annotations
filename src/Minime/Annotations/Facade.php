@@ -2,6 +2,10 @@
 
 namespace Minime\Annotations;
 
+use ReflectionClass;
+use ReflectionMethod;
+use ReflectionProperty;
+
 /**
  *
  * A facade for annotations parsing
@@ -16,15 +20,12 @@ class Facade
      *
      * @param  string                            $class Full qualified class name
      * @return Minime\Annotations\AnnotationsBag Annotations collection
-     * @throws \\ReflectionException              If class is not found
+     * @throws \\ReflectionException             If class is not found
      */
     public static function getClassAnnotations($class)
     {
-        $reflection = new \ReflectionClass($class);
-        $rules = new ParserRules;
-        $docblock = (new Parser($reflection->getDocComment(), $rules))->parse();
-
-        return new AnnotationsBag($docblock, $rules);
+        return (new Parser(new ParserRules))
+            ->parse((new ReflectionClass($class))->getDocComment());
     }
 
     /**
@@ -33,15 +34,12 @@ class Facade
      * @param  string                            $class    Full qualified class name
      * @param  string                            $property Property name
      * @return Minime\Annotations\AnnotationsBag Annotations collection
-     * @throws \\ReflectionException              If property is undefined
+     * @throws \\ReflectionException             If property is undefined
      */
     public static function getPropertyAnnotations($class, $property)
     {
-        $reflection = new \ReflectionProperty($class, $property);
-        $rules = new ParserRules();
-        $docblock = (new Parser($reflection->getDocComment(), $rules))->parse();
-
-        return new AnnotationsBag($docblock, $rules);
+        return (new Parser(new ParserRules))
+            ->parse((new ReflectionProperty($class, $property))->getDocComment());
     }
 
     /**
@@ -50,14 +48,11 @@ class Facade
      * @param  string                            $class    Full qualified class name
      * @param  string                            $property Method name
      * @return Minime\Annotations\AnnotationsBag Annotations collection
-     * @throws \\ReflectionException              If method is undefined
+     * @throws \\ReflectionException             If method is undefined
      */
     public static function getMethodAnnotations($class, $method)
     {
-        $reflection = new \ReflectionMethod($class, $method);
-        $rules = new ParserRules();
-        $docblock = (new Parser($reflection->getDocComment(), $rules))->parse();
-
-        return new AnnotationsBag($docblock, $rules);
+        return (new Parser(new ParserRules))
+            ->parse((new ReflectionMethod($class, $method))->getDocComment());
     }
 }

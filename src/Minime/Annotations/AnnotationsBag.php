@@ -3,6 +3,12 @@
 namespace Minime\Annotations;
 
 use Minime\Annotations\Interfaces\ParserRulesInterface;
+use IteratorAggregate;
+use Countable;
+use ArrayAccess;
+use JsonSerializable;
+use ArrayIterator;
+use InvalidArgumentException;
 
 /**
  *
@@ -11,7 +17,7 @@ use Minime\Annotations\Interfaces\ParserRulesInterface;
  * @package Annotations
  *
  */
-class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \JsonSerializable
+class AnnotationsBag implements IteratorAggregate, Countable, ArrayAccess, JsonSerializable
 {
 
     /**
@@ -45,9 +51,9 @@ class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \J
     */
     public function replace(array $attributes)
     {
-        foreach (array_keys($attributes) as $key) {
+        foreach ($attributes as $key => $value) {
             if ($this->rules->isKeyValid($key)) {
-                $this->attributes[$key] = $attributes[$key];
+                $this->attributes[$key] = $value;
             }
         }
 
@@ -75,7 +81,7 @@ class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \J
     public function has($key)
     {
         if (! $this->rules->isKeyValid($key)) {
-            throw new \InvalidArgumentException('Annotation key must be a valid annotation name string, according to parser rules.');
+            throw new InvalidArgumentException('Annotation key must be a valid annotation name string, according to parser rules.');
         }
 
         return array_key_exists($key, $this->attributes);
@@ -93,7 +99,7 @@ class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \J
     public function set($key, $value)
     {
         if (! $this->rules->isKeyValid($key)) {
-            throw new \InvalidArgumentException('Annotation key must be a valid annotation name string, according to parser rules.');
+            throw new InvalidArgumentException('Annotation key must be a valid annotation name string, according to parser rules.');
         }
         $this->attributes[$key] = $value;
 
@@ -145,7 +151,7 @@ class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \J
     public function grep($pattern)
     {
         if (! is_string($pattern)) {
-            throw new \InvalidArgumentException('Grep pattern must be a valid regexp string.');
+            throw new InvalidArgumentException('Grep pattern must be a valid regexp string.');
         }
 
         $results = array_intersect_key($this->attributes, array_flip(
@@ -179,7 +185,7 @@ class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \J
     {
         $pattern = trim($pattern);
         if (! $this->rules->isNamespaceValid($pattern)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Namespace pattern must be a valid namespace string, according to parser rules.'
             );
         }
@@ -231,7 +237,7 @@ class AnnotationsBag implements \IteratorAggregate, \Countable, \ArrayAccess, \J
     */
     public function getIterator()
     {
-        return new \ArrayIterator($this->attributes);
+        return new ArrayIterator($this->attributes);
     }
 
     /**
