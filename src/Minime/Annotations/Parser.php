@@ -132,8 +132,9 @@ class Parser implements ParserInterface
         $identifier = $rules->getAnnotationIdentifier();
         $pattern = '/\\'.$identifier.$rules->getAnnotationNameRegex().'/';
         $typesPattern = '/('. implode('|', $this->types) .')/';
+        $lines = array_map("rtrim", explode("\n", $docblock));
         array_walk(
-            array_map("rtrim", explode("\n", $docblock)),
+            $lines,
             function ($line) use (&$parameters, $identifier, $pattern, $typesPattern) {
                 $line = new StringScanner($line);
                 $line->skip('/\s+\*\s+/');
