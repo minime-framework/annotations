@@ -4,6 +4,7 @@ namespace Minime\Annotations;
 
 use Minime\Annotations\Interfaces\ParserInterface;
 use Minime\Annotations\Interfaces\ParserRulesInterface;
+use Minime\Annotations\Interfaces\CacheInterface;
 use StrScan\StringScanner;
 
 /**
@@ -15,90 +16,163 @@ use StrScan\StringScanner;
  */
 class Parser implements ParserInterface
 {
-
-    /**
-     * The Doc block to parse
-     * @var string
-     */
-    private $raw_doc_block;
-
     /**
      * The ParserRules object
      * @var ParserRulesInterface
      */
-    private $rules;
+    protected $rules;
 
+    /**
+     * The ParserRules object
+     * @var CacheInterface
+     */
+    protected $cache;
+
+    /**
+     * The parsable type in a given docblock
+     *
+     * @var array
+     */
     protected $types = ['string', 'integer', 'float', 'json', 'eval'];
 
     /**
      * Parser constructor
-     * @param string $raw_doc_block the doc block to parse
+     * @param Annotations\Interfaces\ParserRulesInterface $rules
      */
-    public function __construct($raw_doc_block, ParserRulesInterface $rules)
+    public function __construct(ParserRulesInterface $rules = null, CacheInterface $cache = null)
     {
-        $this->raw_doc_block = $raw_doc_block;
         $this->rules = $rules;
+        $this->cache = $cache;
     }
 
     /**
-     * Parse a given docblock
-     * @return AnnotationsBag an AnnotationBag Object
-     */
-    public function parse()
+    * {@inheritdoc}
+    */
+    public function setRules(ParserRulesInterface $rules)
     {
-        $parameters = [];
-        $identifier = $this->rules->getAnnotationIdentifier();
-        $pattern = $identifier.$this->rules->getAnnotationNameRegex();
-        $lines = array_map("rtrim", explode("\n", $this->raw_doc_block));
-        foreach ($lines as $line) {
-            $tokenizer = new StringScanner($line);
-            $tokenizer->skip('/\s+\*\s+/');
-            while (! $tokenizer->hasTerminated()) {
-                $key = $tokenizer->scan('/\\'.$pattern.'/');
-                if (! $key) { // next line when no annotation is found
-                    $tokenizer->terminate();
-                    continue;
-                }
+        $this->rules = $rules;
 
-                $key = str_replace($identifier, '', $key);
-                $tokenizer->skip('/\s+/');
-                if ('' == $tokenizer->peek() || $tokenizer->check('/\\'.$identifier.'/')) { // if implicit boolean
-                    $parameters[$key] = true;
-                    continue;
-                }
+        return $this;
+    }
 
-                $type = 'dynamic';
-                if ($tokenizer->check('/('. implode('|', $this->types) .')/')) { //if strong typed
-                    $type = $tokenizer->scan('/\w+/');
-                    $tokenizer->skip('/\s+/');
-                }
-                $value = $tokenizer->getRemainder();
-                $parameters[$key][] = self::parseValue($value, $type);
-            }
+    /**
+    * {@inheritdoc}
+    */
+    public function getRules()
+    {
+        return $this->rules;
+    }
+
+    /**
+    * {@inheritdoc}
+    */
+    public function setCache(CacheInterface $cache)
+    {
+        $this->cache = $cache;
+
+        return $this;
+    }
+
+    /**
+    * {@inheritdoc}
+    */
+    public function getCache()
+    {
+        return $this->cache;
+    }
+
+    /**
+    * {@inheritdoc}
+    */
+    public function parse($str)
+    {
+        if (null === $this->cache) {
+            return new AnnotationsBag($this->parseDocBlock($str), $this->getRules());
         }
 
-        return self::condense($parameters);
+        $key = $this->fetchCacheKey($str);
+        if (! $this->cache->has($key)) {
+            $this->cache->set($key, function () use ($str) {
+                return new AnnotationsBag($this->parseDocBlock($str), $this->getRules());
+            });
+        }
+        $bag = $this->cache->get($key);
+        if (is_object($bag) && method_exists($bag, '__invoke')) {
+            $annotation = $bag();
+            if (! $annotation instanceof AnnotationsBag) {
+                throw new ParserException('The cache is corrupted the return object is not a AnnotationsBag');
+            }
+
+            return $annotation;
+        }
+        throw new ParserException('The cache is corrupted the return value is not a AnnotationsBag object');
+    }
+
+    public function fetchCacheKey($str)
+    {
+        return md5(trim($str));
     }
 
     /**
-     * Filter an array to converted to string a single value array
-     * @param array $parameters
+     * parse a string
+     *
+     * @param string $docblock the doc block to parse
      *
      * @return array
      */
-    protected static function condense(array $parameters)
+    protected function parseDocBlock($docblock)
     {
-        return array_map(function ($value) {
+        $rules = $this->getRules();
+        if (null === $rules) {
+            throw new ParserException(
+                'You must specify a ParserRules via the `setRules` method or the class constructor'
+            );
+        }
+        $parameters = [];
+        $identifier = $rules->getAnnotationIdentifier();
+        $pattern = '/\\'.$identifier.$rules->getAnnotationNameRegex().'/';
+        $typesPattern = '/('. implode('|', $this->types) .')/';
+        array_walk(
+            array_map("rtrim", explode("\n", $docblock)),
+            function ($line) use (&$parameters, $identifier, $pattern, $typesPattern) {
+                $line = new StringScanner($line);
+                $line->skip('/\s+\*\s+/');
+                while (! $line->hasTerminated()) {
+                    $key = $line->scan($pattern);
+                    if (! $key) { // next line when no annotation is found
+                        $line->terminate();
+                        continue;
+                    }
+
+                    $key = substr($key, strlen($identifier));
+                    $line->skip('/\s+/');
+                    if ('' == $line->peek() || $line->check('/\\'.$identifier.'/')) { // if implicit boolean
+                        $parameters[$key] = true;
+                        continue;
+                    }
+
+                    $type = 'dynamic';
+                    if ($line->check($typesPattern)) { //if strong typed
+                        $type = $line->scan('/\w+/');
+                        $line->skip('/\s+/');
+                    }
+                    $parameters[$key][] = self::parseValue($line->getRemainder(), $type);
+                }
+            }
+        );
+
+        array_walk($parameters, function (&$value) {
             if (is_array($value) && 1 == count($value)) {
                 $value = $value[0];
             }
+        });
 
-            return $value;
-        }, $parameters);
+        return $parameters;
     }
 
     /**
      * Parse a given value against a specific type
+     *
      * @param string $value
      * @param string $type  the type to parse the value against
      *
@@ -115,6 +189,7 @@ class Parser implements ParserInterface
 
     /**
      * Parse a given undefined type value
+     *
      * @param string $value
      *
      * @return scalar|object
@@ -131,6 +206,7 @@ class Parser implements ParserInterface
 
     /**
      * Parse a given value
+     *
      * @param string $value
      *
      * @return scalar|object
@@ -142,6 +218,7 @@ class Parser implements ParserInterface
 
     /**
      * Filter a value to be an Integer
+     *
      * @param string $value
      *
      * @throws ParserException If $value is not an integer
@@ -160,6 +237,7 @@ class Parser implements ParserInterface
 
     /**
      * Filter a value to be a Float
+     *
      * @param string $value
      *
      * @throws ParserException If $value is not a float
@@ -178,6 +256,7 @@ class Parser implements ParserInterface
 
     /**
      * Filter a value to be a Json
+     *
      * @param string $value
      *
      * @throws ParserException If $value is not a Json
@@ -197,6 +276,7 @@ class Parser implements ParserInterface
 
     /**
      * Filter a value to be a PHP eval
+     *
      * @param string $value
      *
      * @throws ParserException If $value is not a valid PHP code
